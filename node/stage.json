@@ -1,0 +1,22 @@
+{
+  "environment": "stage",
+  "nodeName": "node-01",
+  "nodeType": "worker",
+  "region": "us-east-1",
+  "availabilityZone": "us-east-1b",
+  "instanceType": "t3.medium",
+  "os": "Amazon Linux 2023",
+  "kubernetes": {
+    "role": "worker",
+    "version": "1.36"
+  },
+  "resources": {
+    "cpu": "2",
+    "memory": "4Gi",
+    "disk": "50Gi"
+  },
+  "labels": {
+    "environment": "stage",
+    "team": "qa"
+  }
+}
