@@ -1,0 +1,20 @@
+{
+  "environment": "uat",
+  "appName": "myapp",
+  "version": "1.0.0",
+  "replicas": 2,
+  "logLevel": "INFO",
+  "database": {
+    "host": "uat-db.example.com",
+    "port": 5432,
+    "name": "myapp_uat"
+  },
+  "resources": {
+    "cpu": "500m",
+    "memory": "512Mi"
+  },
+  "features": {
+    "debug": false,
+    "maintenanceMode": false
+  }
+}
