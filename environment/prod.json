@@ -1,0 +1,20 @@
+{
+  "environment": "prod",
+  "appName": "myapp",
+  "version": "1.0.0",
+  "replicas": 5,
+  "logLevel": "WARN",
+  "database": {
+    "host": "prod-db.example.com",
+    "port": 5432,
+    "name": "myapp_prod"
+  },
+  "resources": {
+    "cpu": "1",
+    "memory": "2Gi"
+  },
+  "features": {
+    "debug": false,
+    "maintenanceMode": false
+  }
+}
