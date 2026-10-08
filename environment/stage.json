@@ -1,7 +1,7 @@
 {
   "environment": "stage",
   "appName": "myapp",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "replicas": 3,
   "logLevel": "INFO",
   "database": {
