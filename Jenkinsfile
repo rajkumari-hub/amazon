@@ -1,13 +1,11 @@
 pipeline {
-
     agent any
 
     parameters {
-
         choice(
             name: 'CONFIG_TYPE',
-            choices: ['environment', 'nodes'],
-            description: 'Select the configuration folder'
+            choices: ['environment', 'node'],
+            description: 'Select configuration type'
         )
 
         choice(
@@ -19,7 +17,7 @@ pipeline {
         string(
             name: 'VERSION',
             defaultValue: '1.0.0',
-            description: 'Application version'
+            description: 'Application/configuration version'
         )
 
         string(
@@ -36,144 +34,170 @@ pipeline {
 
         string(
             name: 'TARGET_BRANCH',
-            defaultValue: 'feature',
-            description: 'Branch where Pull Request should be raised'
+            defaultValue: 'feature/practice',
+            description: 'Target branch for Pull Request'
         )
     }
 
     environment {
-        APP_NAME = "amazon"
+        APP_NAME = 'amazon'
     }
 
     stages {
 
-        stage('Checkout') {
-
+        stage('Display Parameters') {
             steps {
-
-                echo "Checking out repository..."
-
-                checkout scm
+                echo '======================================'
+                echo 'Amazon Configuration Pipeline'
+                echo '======================================'
+                echo "CONFIG_TYPE  : ${params.CONFIG_TYPE}"
+                echo "ENVIRONMENT  : ${params.ENVIRONMENT}"
+                echo "VERSION      : ${params.VERSION}"
+                echo "REPLICAS     : ${params.REPLICAS}"
+                echo "LOG_LEVEL    : ${params.LOG_LEVEL}"
+                echo "TARGET_BRANCH: ${params.TARGET_BRANCH}"
+                echo '======================================'
             }
         }
 
-        stage('Display Parameters') {
-
+        stage('Checkout Code') {
             steps {
+                echo 'Checking out amazon repository...'
 
-                echo "================================"
-                echo "Configuration Type : ${params.CONFIG_TYPE}"
-                echo "Environment        : ${params.ENVIRONMENT}"
-                echo "Version            : ${params.VERSION}"
-                echo "Replicas           : ${params.REPLICAS}"
-                echo "Log Level          : ${params.LOG_LEVEL}"
-                echo "Target Branch      : ${params.TARGET_BRANCH}"
-                echo "================================"
+                git(
+                    url: 'https://github.com/rajkumari-hub/amazon.git',
+                    branch: 'main',
+                    credentialsId: 'github-credentials'
+                )
+            }
+        }
+
+        stage('Verify Repository') {
+            steps {
+                sh '''
+                    echo "======================================"
+                    echo "Current Directory"
+                    echo "======================================"
+                    pwd
+
+                    echo "======================================"
+                    echo "Repository Files"
+                    echo "======================================"
+                    ls -la
+
+                    echo "======================================"
+                    echo "Git Branch"
+                    echo "======================================"
+                    git branch --show-current
+
+                    echo "======================================"
+                    echo "Git Commit"
+                    echo "======================================"
+                    git log -1 --oneline
+                '''
             }
         }
 
         stage('Determine JSON File') {
-
             steps {
-
                 script {
+                    env.JSON_FILE = "${params.CONFIG_TYPE}/${params.ENVIRONMENT}.json"
 
-                    env.JSON_FILE =
-                        "${params.CONFIG_TYPE}/${params.ENVIRONMENT}.json"
+                    echo '======================================'
+                    echo 'JSON FILE SELECTION'
+                    echo '======================================'
+                    echo "Configuration Type : ${params.CONFIG_TYPE}"
+                    echo "Environment        : ${params.ENVIRONMENT}"
+                    echo "Selected JSON File : ${env.JSON_FILE}"
+                    echo '======================================'
 
-                    echo "JSON file selected: ${env.JSON_FILE}"
+                    if (!fileExists(env.JSON_FILE)) {
+                        error("JSON file does not exist: ${env.JSON_FILE}")
+                    }
                 }
             }
         }
 
         stage('Validate Existing JSON') {
-
             steps {
+                sh '''
+                    echo "Validating existing JSON..."
+                    python3 -m json.tool "$JSON_FILE" > /dev/null
 
-                sh """
-                    python3 -m json.tool ${JSON_FILE}
-                """
+                    echo "JSON validation successful."
+                '''
             }
         }
 
         stage('Update JSON') {
-
             steps {
-
                 sh '''
-python3 <<EOF
-
+                    python3 <<'PYTHON'
 import json
+import os
 
-file = "${JSON_FILE}"
+file_name = os.environ["JSON_FILE"]
+config_type = os.environ["CONFIG_TYPE"]
+version = os.environ["VERSION"]
+replicas = os.environ["REPLICAS"]
+log_level = os.environ["LOG_LEVEL"]
 
-with open(file, "r") as f:
-    data = json.load(f)
+with open(file_name, "r") as file:
+    data = json.load(file)
 
-data["version"] = "${VERSION}"
-data["replicas"] = int("${REPLICAS}")
-data["logLevel"] = "${LOG_LEVEL}"
+if config_type == "environment":
+    data["version"] = version
+    data["replicas"] = int(replicas)
+    data["logLevel"] = log_level
 
-with open(file, "w") as f:
-    json.dump(data, f, indent=2)
+elif config_type == "node":
+    data["version"] = version
 
-EOF
+with open(file_name, "w") as file:
+    json.dump(data, file, indent=2)
+    file.write("\\n")
+
+print(f"Updated: {file_name}")
+PYTHON
                 '''
             }
         }
 
         stage('Validate Updated JSON') {
-
             steps {
+                sh '''
+                    echo "Validating updated JSON..."
+                    python3 -m json.tool "$JSON_FILE" > /dev/null
 
-                sh """
-                    python3 -m json.tool ${JSON_FILE}
-                """
+                    echo "Updated JSON is valid."
+                '''
             }
         }
 
         stage('Show Changes') {
-
             steps {
+                sh '''
+                    echo "======================================"
+                    echo "Git Changes"
+                    echo "======================================"
 
-                sh """
-                    echo "Changed file:"
-                    git diff -- ${JSON_FILE}
-                """
-            }
-        }
-
-        stage('Build') {
-
-            steps {
-
-                echo "Building Amazon application..."
-            }
-        }
-
-        stage('Test') {
-
-            steps {
-
-                echo "Running tests..."
-            }
-        }
-
-        stage('SonarQube') {
-
-            steps {
-
-                echo "SonarQube analysis will run here..."
-            }
-        }
-
-        stage('Nexus') {
-
-            steps {
-
-                echo "Artifact will be uploaded to Nexus..."
+                    git diff -- "$JSON_FILE"
+                '''
             }
         }
     }
-}
 
+    post {
+        success {
+            echo '======================================'
+            echo 'JSON UPDATE PIPELINE SUCCESSFUL'
+            echo '======================================'
+        }
+
+        failure {
+            echo '======================================'
+            echo 'PIPELINE FAILED'
+            echo '======================================'
+        }
+    }
+}
