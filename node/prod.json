@@ -1,0 +1,22 @@
+{
+  "environment": "prod",
+  "nodeName": "node-01",
+  "nodeType": "worker",
+  "region": "us-east-1",
+  "availabilityZone": "us-east-1b",
+  "instanceType": "t3.large",
+  "os": "Amazon Linux 2023",
+  "kubernetes": {
+    "role": "worker",
+    "version": "1.36"
+  },
+  "resources": {
+    "cpu": "2",
+    "memory": "8Gi",
+    "disk": "100Gi"
+  },
+  "labels": {
+    "environment": "prod",
+    "team": "platform"
+  }
+}
