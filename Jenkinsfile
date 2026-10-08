@@ -43,7 +43,7 @@ pipeline {
         APP_NAME = 'amazon'
 
         // Change this to your actual Nexus server URL
-        NEXUS_URL = 'http://<NEXUS-IP>:8081'
+        NEXUS_URL = 'http://3.236.183.87:8081'
 
         // Nexus raw hosted repository
         NEXUS_REPO = 'amazon-config'
