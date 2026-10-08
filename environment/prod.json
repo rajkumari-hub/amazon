@@ -1,9 +1,9 @@
 {
   "environment": "prod",
   "appName": "myapp",
-  "version": "1.0.0",
-  "replicas": 5,
-  "logLevel": "WARN",
+  "version": "1.0.6",
+  "replicas": 3,
+  "logLevel": "INFO",
   "database": {
     "host": "prod-db.example.com",
     "port": 5432,
