@@ -18,5 +18,6 @@
   "labels": {
     "environment": "uat",
     "team": "testing"
-  }
+  },
+  "version": "1.0.3"
 }
