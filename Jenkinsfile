@@ -278,12 +278,35 @@ EOF
                 echo "Source Branch : $FEATURE_BRANCH"
                 echo "Target Branch : $TARGET_BRANCH"
 
+                python3 <<PYTHON
+import json
+import os
+
+data = {
+    "title": f"Update {os.environ['JSON_FILE']} from Jenkins build {os.environ['BUILD_NUMBER']}",
+    "head": os.environ["FEATURE_BRANCH"],
+    "base": os.environ["TARGET_BRANCH"],
+    "body": f"Automated Pull Request created by Jenkins build {os.environ['BUILD_NUMBER']}."
+}
+
+with open("pull-request.json", "w") as file:
+    json.dump(data, file)
+
+print("Pull request JSON created successfully.")
+PYTHON
+
+                echo "Request body:"
+                cat pull-request.json
+
                 RESPONSE=$(curl -sS -X POST \
                     -H "Accept: application/vnd.github+json" \
                     -H "Authorization: Bearer $GITHUB_TOKEN" \
                     -H "X-GitHub-Api-Version: 2022-11-28" \
                     https://api.github.com/repos/rajkumari-hub/amazon/pulls \
-                    -d "{\"title\":\"Update $JSON_FILE from Jenkins build $BUILD_NUMBER\",\"head\":\"$FEATURE_BRANCH\",\"base\":\"$TARGET_BRANCH\",\"body\":\"Automated Pull Request created by Jenkins build $BUILD_NUMBER.\"}")
+                    --data-binary @pull-request.json)
+
+                echo "GitHub API Response:"
+                echo "$RESPONSE"
 
                 echo "$RESPONSE" | python3 -c '
 import json
@@ -292,15 +315,23 @@ import sys
 data = json.load(sys.stdin)
 
 if "html_url" in data:
+    print("======================================")
     print("Pull Request created successfully")
     print("PR URL:", data["html_url"])
+    print("======================================")
+
 elif "message" in data:
+    print("======================================")
     print("GitHub API Error:", data["message"])
+    print("======================================")
     sys.exit(1)
+
 else:
     print("Unexpected GitHub API response")
     sys.exit(1)
 '
+
+                rm -f pull-request.json
             '''
         }
     }
