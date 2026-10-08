@@ -261,6 +261,51 @@ EOF
         }
     }
 }
+
+	stage('Create Pull Request') {
+    steps {
+        withCredentials([
+            string(
+                credentialsId: 'github-pr-token',
+                variable: 'GITHUB_TOKEN'
+            )
+        ]) {
+            sh '''
+                echo "======================================"
+                echo "Creating Pull Request"
+                echo "======================================"
+
+                echo "Source Branch : $FEATURE_BRANCH"
+                echo "Target Branch : $TARGET_BRANCH"
+
+                RESPONSE=$(curl -sS -X POST \
+                    -H "Accept: application/vnd.github+json" \
+                    -H "Authorization: Bearer $GITHUB_TOKEN" \
+                    -H "X-GitHub-Api-Version: 2022-11-28" \
+                    https://api.github.com/repos/rajkumari-hub/amazon/pulls \
+                    -d "{\"title\":\"Update $JSON_FILE from Jenkins build $BUILD_NUMBER\",\"head\":\"$FEATURE_BRANCH\",\"base\":\"$TARGET_BRANCH\",\"body\":\"Automated Pull Request created by Jenkins build $BUILD_NUMBER.\"}")
+
+                echo "$RESPONSE" | python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+
+if "html_url" in data:
+    print("Pull Request created successfully")
+    print("PR URL:", data["html_url"])
+elif "message" in data:
+    print("GitHub API Error:", data["message"])
+    sys.exit(1)
+else:
+    print("Unexpected GitHub API response")
+    sys.exit(1)
+'
+            '''
+        }
+    }
+}
+
     }
 
     post {
