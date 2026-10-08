@@ -1,0 +1,22 @@
+{
+  "environment": "uat",
+  "nodeName": "node-01",
+  "nodeType": "worker",
+  "region": "us-east-1",
+  "availabilityZone": "us-east-1a",
+  "instanceType": "t3.medium",
+  "os": "Amazon Linux 2023",
+  "kubernetes": {
+    "role": "worker",
+    "version": "1.36"
+  },
+  "resources": {
+    "cpu": "2",
+    "memory": "4Gi",
+    "disk": "30Gi"
+  },
+  "labels": {
+    "environment": "uat",
+    "team": "testing"
+  }
+}
