@@ -156,7 +156,7 @@ elif config_type == "node":
 
 with open(file_name, "w") as file:
     json.dump(data, file, indent=2)
-    file.write("\n")
+    file.write("\\n")
 
 print(f"Updated: {file_name}")
 PYTHON
