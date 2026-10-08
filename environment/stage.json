@@ -1,0 +1,20 @@
+{
+  "environment": "stage",
+  "appName": "myapp",
+  "version": "1.0.0",
+  "replicas": 3,
+  "logLevel": "INFO",
+  "database": {
+    "host": "stage-db.example.com",
+    "port": 5432,
+    "name": "myapp_stage"
+  },
+  "resources": {
+    "cpu": "500m",
+    "memory": "1Gi"
+  },
+  "features": {
+    "debug": false,
+    "maintenanceMode": false
+  }
+}
