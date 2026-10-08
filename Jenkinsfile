@@ -34,7 +34,7 @@ pipeline {
 
         string(
             name: 'TARGET_BRANCH',
-            defaultValue: 'feature/practice',
+            defaultValue: 'feature',
             description: 'Target branch for Pull Request'
         )
     }
@@ -122,6 +122,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Validating existing JSON..."
+
                     python3 -m json.tool "$JSON_FILE" > /dev/null
 
                     echo "JSON validation successful."
@@ -155,7 +156,7 @@ elif config_type == "node":
 
 with open(file_name, "w") as file:
     json.dump(data, file, indent=2)
-    file.write("\\n")
+    file.write("\n")
 
 print(f"Updated: {file_name}")
 PYTHON
@@ -167,6 +168,7 @@ PYTHON
             steps {
                 sh '''
                     echo "Validating updated JSON..."
+
                     python3 -m json.tool "$JSON_FILE" > /dev/null
 
                     echo "Updated JSON is valid."
@@ -174,62 +176,77 @@ PYTHON
             }
         }
 
+        stage('Show Changes') {
+            steps {
+                sh '''
+                    echo "======================================"
+                    echo "Git Changes"
+                    echo "======================================"
+
+                    git diff -- "$JSON_FILE"
+                '''
+            }
+        }
+
         stage('Create Feature Branch') {
-    steps {
-        script {
-            env.FEATURE_BRANCH =
-                "jenkins/${params.CONFIG_TYPE}-${params.ENVIRONMENT}-build-${env.BUILD_NUMBER}"
+            steps {
+                script {
+                    env.FEATURE_BRANCH =
+                        "jenkins/${params.CONFIG_TYPE}-${params.ENVIRONMENT}-build-${env.BUILD_NUMBER}"
 
-            echo "======================================"
-            echo "Creating Feature Branch"
-            echo "======================================"
-            echo "Source Branch  : ${params.TARGET_BRANCH}"
-            echo "Feature Branch : ${env.FEATURE_BRANCH}"
-            echo "======================================"
+                    echo '======================================'
+                    echo 'Creating Feature Branch'
+                    echo '======================================'
+                    echo "Source Branch  : ${params.TARGET_BRANCH}"
+                    echo "Feature Branch : ${env.FEATURE_BRANCH}"
+                    echo '======================================'
 
-            sh """
-                git checkout -b "${FEATURE_BRANCH}"
-            """
+                    sh """
+                        git checkout -b "${FEATURE_BRANCH}"
+                    """
+                }
+            }
+        }
+
+        stage('Commit Changes') {
+            steps {
+                sh '''
+                    echo "======================================"
+                    echo "Committing Changes"
+                    echo "======================================"
+
+                    git config user.name "Jenkins"
+                    git config user.email "jenkins@localhost"
+
+                    git add "$JSON_FILE"
+
+                    git commit \
+                        -m "Update $JSON_FILE from Jenkins build $BUILD_NUMBER"
+                '''
+            }
+        }
+
+        stage('Push Feature Branch') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github-credentials',
+                        usernameVariable: 'GIT_USERNAME',
+                        passwordVariable: 'GIT_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        echo "======================================"
+                        echo "Pushing Feature Branch"
+                        echo "======================================"
+                        echo "Branch: $FEATURE_BRANCH"
+
+                        git push origin "$FEATURE_BRANCH"
+                    '''
+                }
+            }
         }
     }
-}
-	stage('Commit Changes') {
-    steps {
-        sh '''
-            echo "======================================"
-            echo "Committing Changes"
-            echo "======================================"
-
-            git config user.name "Jenkins"
-            git config user.email "jenkins@localhost"
-
-            git add "$JSON_FILE"
-
-            git commit -m "Update $JSON_FILE from Jenkins build $BUILD_NUMBER"
-        '''
-    }
-}
-
-	stage('Push Feature Branch') {
-    steps {
-        withCredentials([
-            usernamePassword(
-                credentialsId: 'github-credentials',
-                usernameVariable: 'GIT_USERNAME',
-                passwordVariable: 'GIT_PASSWORD'
-            )
-        ]) {
-            sh '''
-                echo "======================================"
-                echo "Pushing Feature Branch"
-                echo "======================================"
-                echo "Branch: $FEATURE_BRANCH"
-
-                git push origin "$FEATURE_BRANCH"
-            '''
-        }
-    }
-}
 
     post {
         success {
