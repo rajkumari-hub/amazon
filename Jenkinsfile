@@ -66,7 +66,7 @@ pipeline {
 
                 git(
                     url: 'https://github.com/rajkumari-hub/amazon.git',
-                    branch: 'main',
+                    branch: params.TARGET_BRANCH,
                     credentialsId: 'github-credentials'
                 )
             }
@@ -174,18 +174,62 @@ PYTHON
             }
         }
 
-        stage('Show Changes') {
-            steps {
-                sh '''
-                    echo "======================================"
-                    echo "Git Changes"
-                    echo "======================================"
+        stage('Create Feature Branch') {
+    steps {
+        script {
+            env.FEATURE_BRANCH =
+                "jenkins/${params.CONFIG_TYPE}-${params.ENVIRONMENT}-build-${env.BUILD_NUMBER}"
 
-                    git diff -- "$JSON_FILE"
-                '''
-            }
+            echo "======================================"
+            echo "Creating Feature Branch"
+            echo "======================================"
+            echo "Source Branch  : ${params.TARGET_BRANCH}"
+            echo "Feature Branch : ${env.FEATURE_BRANCH}"
+            echo "======================================"
+
+            sh """
+                git checkout -b "${FEATURE_BRANCH}"
+            """
         }
     }
+}
+	stage('Commit Changes') {
+    steps {
+        sh '''
+            echo "======================================"
+            echo "Committing Changes"
+            echo "======================================"
+
+            git config user.name "Jenkins"
+            git config user.email "jenkins@localhost"
+
+            git add "$JSON_FILE"
+
+            git commit -m "Update $JSON_FILE from Jenkins build $BUILD_NUMBER"
+        '''
+    }
+}
+
+	stage('Push Feature Branch') {
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'github-credentials',
+                usernameVariable: 'GIT_USERNAME',
+                passwordVariable: 'GIT_PASSWORD'
+            )
+        ]) {
+            sh '''
+                echo "======================================"
+                echo "Pushing Feature Branch"
+                echo "======================================"
+                echo "Branch: $FEATURE_BRANCH"
+
+                git push origin "$FEATURE_BRANCH"
+            '''
+        }
+    }
+}
 
     post {
         success {
