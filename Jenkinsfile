@@ -227,25 +227,40 @@ PYTHON
         }
 
         stage('Push Feature Branch') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'github-credentials',
-                        usernameVariable: 'GIT_USERNAME',
-                        passwordVariable: 'GIT_PASSWORD'
-                    )
-                ]) {
-                    sh '''
-                        echo "======================================"
-                        echo "Pushing Feature Branch"
-                        echo "======================================"
-                        echo "Branch: $FEATURE_BRANCH"
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'github-credentials',
+                usernameVariable: 'GIT_USERNAME',
+                passwordVariable: 'GIT_PASSWORD'
+            )
+        ]) {
+            sh '''
+                echo "======================================"
+                echo "Pushing Feature Branch"
+                echo "======================================"
+                echo "Branch: $FEATURE_BRANCH"
 
-                        git push origin "$FEATURE_BRANCH"
-                    '''
-                }
-            }
+                cat > git-askpass.sh <<'EOF'
+#!/bin/sh
+case "$1" in
+    *Username*) echo "$GIT_USERNAME" ;;
+    *Password*) echo "$GIT_PASSWORD" ;;
+esac
+EOF
+
+                chmod 700 git-askpass.sh
+
+                export GIT_ASKPASS="$PWD/git-askpass.sh"
+                export GIT_TERMINAL_PROMPT=0
+
+                git push origin "$FEATURE_BRANCH"
+
+                rm -f git-askpass.sh
+            '''
         }
+    }
+}
     }
 
     post {
