@@ -18,5 +18,6 @@
   "labels": {
     "environment": "stage",
     "team": "qa"
-  }
+  },
+  "version": "2.0.9"
 }
