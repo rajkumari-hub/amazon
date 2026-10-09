@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -34,28 +35,19 @@ pipeline {
 
         string(
             name: 'TARGET_BRANCH',
-            defaultValue: 'feature',
+            defaultValue: 'main',
             description: 'Target branch for Pull Request'
         )
     }
 
     environment {
         APP_NAME = 'amazon'
-
-        // Change this to your actual Nexus server URL
         NEXUS_URL = 'http://13.218.184.207:8081'
-
-        // Nexus raw hosted repository
         NEXUS_REPO = 'amazon-config'
     }
 
     stages {
 
-        /*
-         * ============================================================
-         * 1. DISPLAY PARAMETERS
-         * ============================================================
-         */
         stage('Display Parameters') {
             steps {
                 echo '======================================'
@@ -67,20 +59,11 @@ pipeline {
                 echo "REPLICAS     : ${params.REPLICAS}"
                 echo "LOG_LEVEL    : ${params.LOG_LEVEL}"
                 echo "TARGET_BRANCH: ${params.TARGET_BRANCH}"
-                echo '======================================'
             }
         }
 
-
-        /*
-         * ============================================================
-         * 2. CHECKOUT TARGET BRANCH
-         * ============================================================
-         */
         stage('Checkout Code') {
             steps {
-                echo 'Checking out amazon repository...'
-
                 git(
                     url: 'https://github.com/rajkumari-hub/amazon.git',
                     branch: params.TARGET_BRANCH,
@@ -89,100 +72,51 @@ pipeline {
             }
         }
 
-
-        /*
-         * ============================================================
-         * 3. VERIFY REPOSITORY
-         * ============================================================
-         */
         stage('Verify Repository') {
             steps {
                 sh '''
-                    echo "======================================"
                     echo "Current Directory"
-                    echo "======================================"
                     pwd
 
-                    echo "======================================"
                     echo "Repository Files"
-                    echo "======================================"
                     ls -la
 
-                    echo "======================================"
                     echo "Git Branch"
-                    echo "======================================"
                     git branch --show-current
 
-                    echo "======================================"
-                    echo "Git Commit"
-                    echo "======================================"
+                    echo "Latest Commit"
                     git log -1 --oneline
                 '''
             }
         }
 
-
-        /*
-         * ============================================================
-         * 4. DETERMINE JSON FILE
-         * ============================================================
-         */
         stage('Determine JSON File') {
             steps {
                 script {
                     env.JSON_FILE =
                         "${params.CONFIG_TYPE}/${params.ENVIRONMENT}.json"
 
-                    echo '======================================'
-                    echo 'JSON FILE SELECTION'
-                    echo '======================================'
-                    echo "Configuration Type : ${params.CONFIG_TYPE}"
-                    echo "Environment        : ${params.ENVIRONMENT}"
-                    echo "Selected JSON File : ${env.JSON_FILE}"
-                    echo '======================================'
+                    echo "Selected JSON File: ${env.JSON_FILE}"
 
                     if (!fileExists(env.JSON_FILE)) {
-                        error(
-                            "JSON file does not exist: ${env.JSON_FILE}"
-                        )
+                        error("JSON file does not exist: ${env.JSON_FILE}")
                     }
                 }
             }
         }
 
-
-        /*
-         * ============================================================
-         * 5. VALIDATE EXISTING JSON
-         * ============================================================
-         */
         stage('Validate Existing JSON') {
             steps {
                 sh '''
-                    echo "======================================"
-                    echo "Validating Existing JSON"
-                    echo "======================================"
-
                     python3 -m json.tool "$JSON_FILE" > /dev/null
-
-                    echo "JSON validation successful."
+                    echo "Existing JSON validation successful."
                 '''
             }
         }
 
-
-        /*
-         * ============================================================
-         * 6. UPDATE JSON
-         * ============================================================
-         */
         stage('Update JSON') {
             steps {
                 sh '''
-                    echo "======================================"
-                    echo "Updating JSON"
-                    echo "======================================"
-
                     python3 <<'PYTHON'
 import json
 import os
@@ -200,7 +134,6 @@ if config_type == "environment":
     data["version"] = version
     data["replicas"] = int(replicas)
     data["logLevel"] = log_level
-
 elif config_type == "node":
     data["version"] = version
 
@@ -210,93 +143,54 @@ with open(file_name, "w") as file:
 
 print(f"Updated: {file_name}")
 PYTHON
-
-                    echo "JSON update completed."
                 '''
             }
         }
 
-
-        /*
-         * ============================================================
-         * 7. VALIDATE UPDATED JSON
-         * ============================================================
-         */
         stage('Validate Updated JSON') {
             steps {
                 sh '''
-                    echo "======================================"
-                    echo "Validating Updated JSON"
-                    echo "======================================"
-
                     python3 -m json.tool "$JSON_FILE" > /dev/null
-
                     echo "Updated JSON is valid."
                 '''
             }
         }
 
-
-        /*
-         * ============================================================
-         * 8. SHOW CHANGES
-         * ============================================================
-         */
         stage('Show Changes') {
             steps {
                 sh '''
-                    echo "======================================"
-                    echo "Git Changes"
-                    echo "======================================"
-
                     git diff -- "$JSON_FILE"
                 '''
             }
         }
 
-
-        /*
-         * ============================================================
-         * 9. CREATE JENKINS BRANCH
-         * ============================================================
-         */
         stage('Create Feature Branch') {
             steps {
                 script {
                     env.FEATURE_BRANCH =
                         "jenkins/${params.CONFIG_TYPE}-${params.ENVIRONMENT}-build-${env.BUILD_NUMBER}"
 
-                    echo '======================================'
-                    echo 'Creating Feature Branch'
-                    echo '======================================'
-                    echo "Source Branch  : ${params.TARGET_BRANCH}"
-                    echo "Feature Branch : ${env.FEATURE_BRANCH}"
-                    echo '======================================'
+                    echo "Creating branch: ${env.FEATURE_BRANCH}"
 
-                    sh """
-                        git checkout -b "${FEATURE_BRANCH}"
-                    """
+                    sh '''
+                        git checkout -b "$FEATURE_BRANCH"
+                    '''
                 }
             }
         }
 
-
-        /*
-         * ============================================================
-         * 10. COMMIT CHANGES
-         * ============================================================
-         */
         stage('Commit Changes') {
             steps {
                 sh '''
-                    echo "======================================"
-                    echo "Committing Changes"
-                    echo "======================================"
-
                     git config user.name "Jenkins"
                     git config user.email "jenkins@localhost"
 
                     git add "$JSON_FILE"
+
+                    if git diff --cached --quiet; then
+                        echo "No changes to commit."
+                        exit 1
+                    fi
 
                     git commit \
                         -m "Update $JSON_FILE from Jenkins build $BUILD_NUMBER"
@@ -304,12 +198,6 @@ PYTHON
             }
         }
 
-
-        /*
-         * ============================================================
-         * 11. PUSH JENKINS BRANCH
-         * ============================================================
-         */
         stage('Push Feature Branch') {
             steps {
                 withCredentials([
@@ -320,17 +208,13 @@ PYTHON
                     )
                 ]) {
                     sh '''
-                        echo "======================================"
-                        echo "Pushing Feature Branch"
-                        echo "======================================"
-
-                        echo "Branch: $FEATURE_BRANCH"
+                        set -eu
 
                         cat > git-askpass.sh <<'EOF'
 #!/bin/sh
 case "$1" in
-    *Username*) echo "$GIT_USERNAME" ;;
-    *Password*) echo "$GIT_PASSWORD" ;;
+    *Username*) printf '%s\\n' "$GIT_USERNAME" ;;
+    *Password*) printf '%s\\n' "$GIT_PASSWORD" ;;
 esac
 EOF
 
@@ -340,27 +224,14 @@ EOF
                         export GIT_TERMINAL_PROMPT=0
 
                         git push origin "$FEATURE_BRANCH"
-
-                        rm -f git-askpass.sh
                     '''
                 }
             }
         }
 
-
-        /*
-         * ============================================================
-         * 12. SONARQUBE ANALYSIS
-         * ============================================================
-         */
         stage('SonarQube Analysis') {
             steps {
                 script {
-
-                    echo "======================================"
-                    echo "SonarQube Analysis"
-                    echo "======================================"
-
                     def scannerHome = tool 'SonarScanner'
 
                     withSonarQubeEnv('SonarQube') {
@@ -377,71 +248,31 @@ EOF
             }
         }
 
-
-        /*
-         * ============================================================
-         * 13. QUALITY GATE
-         * ============================================================
-         */
         stage('Quality Gate') {
             steps {
-
-                echo "======================================"
-                echo "Waiting for SonarQube Quality Gate"
-                echo "======================================"
-
-                timeout(
-                    time: 10,
-                    unit: 'MINUTES'
-                ) {
-                    waitForQualityGate(
-                        abortPipeline: true
-                    )
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate(abortPipeline: true)
                 }
 
                 echo "SonarQube Quality Gate passed."
             }
         }
 
-
-        /*
-         * ============================================================
-         * 14. PACKAGE ARTIFACT
-         * ============================================================
-         */
         stage('Package Artifact') {
             steps {
-
                 sh '''
-                    echo "======================================"
-                    echo "Packaging Artifact"
-                    echo "======================================"
-
                     ARTIFACT_NAME="amazon-${CONFIG_TYPE}-${ENVIRONMENT}-${VERSION}-build-${BUILD_NUMBER}.tar.gz"
-
-                    echo "Selected JSON : $JSON_FILE"
-                    echo "Artifact Name : $ARTIFACT_NAME"
 
                     tar -czf "$ARTIFACT_NAME" "$JSON_FILE"
 
-                    echo "======================================"
-                    echo "Artifact Created"
-                    echo "======================================"
-
+                    echo "Artifact created: $ARTIFACT_NAME"
                     ls -lh "$ARTIFACT_NAME"
                 '''
             }
         }
 
-
-        /*
-         * ============================================================
-         * 15. UPLOAD ARTIFACT TO NEXUS
-         * ============================================================
-         */
         stage('Upload to Nexus') {
             steps {
-
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'nexus-credentials',
@@ -449,131 +280,149 @@ EOF
                         passwordVariable: 'NEXUS_PASSWORD'
                     )
                 ]) {
-
                     sh '''
-                        echo "======================================"
-                        echo "Uploading Artifact to Nexus"
-                        echo "======================================"
+                        set -eu
 
                         ARTIFACT_NAME="amazon-${CONFIG_TYPE}-${ENVIRONMENT}-${VERSION}-build-${BUILD_NUMBER}.tar.gz"
-
-                        echo "Nexus Repository : $NEXUS_REPO"
-                        echo "Artifact         : $ARTIFACT_NAME"
 
                         curl --fail --silent --show-error \
                             -u "$NEXUS_USER:$NEXUS_PASSWORD" \
                             --upload-file "$ARTIFACT_NAME" \
                             "$NEXUS_URL/repository/$NEXUS_REPO/$ARTIFACT_NAME"
 
-                        echo "======================================"
-                        echo "Artifact Uploaded Successfully"
-                        echo "======================================"
-
-                        echo "Repository URL:"
-                        echo "$NEXUS_URL/repository/$NEXUS_REPO/$ARTIFACT_NAME"
+                        echo "Artifact uploaded successfully."
                     '''
                 }
             }
         }
 
-
-        /*
-         * ============================================================
-         * 16. CREATE GITHUB PULL REQUEST
-         * ============================================================
-         */
         stage('Create Pull Request') {
             steps {
+                script {
+                    withCredentials([
+                        string(
+                            credentialsId: 'github-pr-token',
+                            variable: 'GITHUB_TOKEN'
+                        )
+                    ]) {
+                        sh '''
+                            set -eu
 
-                withCredentials([
-                    string(
-                        credentialsId: 'github-pr-token',
-                        variable: 'GITHUB_TOKEN'
-                    )
-                ]) {
-
-                    sh '''
-                        echo "======================================"
-                        echo "Creating Pull Request"
-                        echo "======================================"
-
-                        echo "Source Branch : $FEATURE_BRANCH"
-                        echo "Target Branch : $TARGET_BRANCH"
-
-                        python3 <<PYTHON
+                            python3 <<'PYTHON'
 import json
 import os
 
 data = {
-    "title": f"Update {os.environ['JSON_FILE']} from Jenkins build {os.environ['BUILD_NUMBER']}",
+    "title": (
+        f"Update {os.environ['JSON_FILE']} "
+        f"from Jenkins build {os.environ['BUILD_NUMBER']}"
+    ),
     "head": os.environ["FEATURE_BRANCH"],
     "base": os.environ["TARGET_BRANCH"],
-    "body": f"Automated Pull Request created by Jenkins build {os.environ['BUILD_NUMBER']}."
+    "body": (
+        f"Automated Pull Request created by Jenkins build "
+        f"{os.environ['BUILD_NUMBER']}."
+    )
 }
 
 with open("pull-request.json", "w") as file:
     json.dump(data, file)
-
-print("Pull request JSON created successfully.")
 PYTHON
 
-                        echo "======================================"
-                        echo "Request Body"
-                        echo "======================================"
+                            RESPONSE=$(curl --fail-with-body --silent --show-error \
+                                -X POST \
+                                -H "Accept: application/vnd.github+json" \
+                                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                                -H "X-GitHub-Api-Version: 2022-11-28" \
+                                -H "Content-Type: application/json" \
+                                https://api.github.com/repos/rajkumari-hub/amazon/pulls \
+                                --data-binary @pull-request.json)
 
-                        cat pull-request.json
-
-                        RESPONSE=$(curl -sS -X POST \
-                            -H "Accept: application/vnd.github+json" \
-                            -H "Authorization: Bearer $GITHUB_TOKEN" \
-                            -H "X-GitHub-Api-Version: 2022-11-28" \
-                            https://api.github.com/repos/rajkumari-hub/amazon/pulls \
-                            --data-binary @pull-request.json)
-
-                        echo "======================================"
-                        echo "GitHub API Response"
-                        echo "======================================"
-
-                        echo "$RESPONSE"
-
-                        echo "$RESPONSE" | python3 -c '
+                            printf '%s' "$RESPONSE" | python3 -c '
 import json
 import sys
 
 data = json.load(sys.stdin)
 
-if "html_url" in data:
-    print("======================================")
-    print("Pull Request created successfully")
-    print("PR URL:", data["html_url"])
-    print("======================================")
-
-elif "message" in data:
-    print("======================================")
-    print("GitHub API Error:", data["message"])
-    print("======================================")
+if "number" not in data or "html_url" not in data:
+    print(data.get("message", "Unexpected GitHub API response"),
+          file=sys.stderr)
     sys.exit(1)
 
-else:
-    print("Unexpected GitHub API response")
-    sys.exit(1)
+with open("pr-number.txt", "w") as file:
+    file.write(str(data["number"]))
+
+print("Pull Request created successfully.")
+print("PR number:", data["number"])
+print("PR URL:", data["html_url"])
 '
+                        '''
+                    }
 
-                        rm -f pull-request.json
-                    '''
+                    env.PR_NUMBER = readFile('pr-number.txt').trim()
+
+                    echo "Created Pull Request: #${env.PR_NUMBER}"
+                }
+            }
+        }
+
+        /*
+         * AUTOMATIC MERGE
+         * Runs only after every preceding stage succeeds.
+         */
+        stage('Automatic PR Merge') {
+            steps {
+                script {
+                    if (!env.PR_NUMBER?.trim()) {
+                        error("Pull Request number is missing.")
+                    }
+
+                    withCredentials([
+                        string(
+                            credentialsId: 'github-pr-token',
+                            variable: 'GITHUB_TOKEN'
+                        )
+                    ]) {
+                        sh '''
+                            set -eu
+
+                            echo "======================================"
+                            echo "Automatically merging Pull Request"
+                            echo "PR Number: $PR_NUMBER"
+                            echo "Target Branch: $TARGET_BRANCH"
+                            echo "======================================"
+
+                            RESPONSE=$(curl --fail-with-body --silent --show-error \
+                                -X PUT \
+                                "https://api.github.com/repos/rajkumari-hub/amazon/pulls/${PR_NUMBER}/merge" \
+                                -H "Accept: application/vnd.github+json" \
+                                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                                -H "X-GitHub-Api-Version: 2022-11-28" \
+                                -H "Content-Type: application/json" \
+                                -d '{"merge_method":"squash"}')
+
+                            printf '%s' "$RESPONSE" | python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+
+if data.get("merged") is not True:
+    print(data.get("message", "GitHub did not merge the PR"),
+          file=sys.stderr)
+    sys.exit(1)
+
+print("Pull Request merged successfully.")
+print("Merge SHA:", data.get("sha", "not returned"))
+'
+                        '''
+                    }
                 }
             }
         }
     }
 
-
-    /*
-     * ================================================================
-     * POST ACTIONS
-     * ================================================================
-     */
     post {
-
         success {
             echo '======================================'
             echo 'AMAZON CI/CD PIPELINE SUCCESSFUL'
@@ -582,6 +431,7 @@ else:
             echo "Configuration: ${params.CONFIG_TYPE}"
             echo "Environment  : ${params.ENVIRONMENT}"
             echo "Version      : ${params.VERSION}"
+            echo "PR Number    : ${env.PR_NUMBER}"
             echo '======================================'
         }
 
@@ -589,7 +439,7 @@ else:
             echo '======================================'
             echo 'PIPELINE FAILED'
             echo '======================================'
-            echo "Build Number : ${env.BUILD_NUMBER}"
+            echo "Build Number: ${env.BUILD_NUMBER}"
             echo 'Check the failed stage in Console Output.'
             echo '======================================'
         }
@@ -598,6 +448,7 @@ else:
             sh '''
                 rm -f git-askpass.sh
                 rm -f pull-request.json
+                rm -f pr-number.txt
             '''
         }
     }
