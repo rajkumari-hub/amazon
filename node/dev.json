@@ -18,5 +18,6 @@
   "labels": {
     "environment": "dev",
     "team": "development"
-  }
+  },
+  "version": "1.0.7"
 }
