@@ -1,7 +1,7 @@
 {
   "environment": "dev",
   "appName": "myapp",
-  "version": "1.0.5",
+  "version": "1.2.8",
   "replicas": 2,
   "logLevel": "DEBUG",
   "database": {
